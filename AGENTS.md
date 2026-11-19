@@ -1,0 +1,70 @@
+# AGENTS.md
+
+Read <https://docs.deep.space/llms.txt>, then fetch the relevant documentation
+page as Markdown by appending `.md`. The installed package types and CLI
+`--help` describe the exact version in this project. Use your existing HTTP,
+shell, and browser tools; no skill, plugin, connector, or session restart is
+required. Installing the optional skill is a separate explicit choice.
+
+## About this project
+
+This is a **DeepSpace** app — a real-time collaborative app built on the
+[`deepspace`](https://www.npmjs.com/package/deepspace) SDK and deployed to
+Cloudflare Workers via `npx deepspace deploy`.
+
+## Version control
+
+The app's **cloud repo** on the DeepSpace platform is the default version
+control; no external account is needed. The first DeepSpace push/pull/deploy
+command installs its Git remote as `space`. **Don't set up GitHub (or another
+git host) unless the developer explicitly asks.** With the default DeepSpace
+source, commit before you deploy: the release records that commit and refuses
+a dirty worktree. When the app ships from GitHub (latched from the checkout's
+remote at the app's first release, permanently), deploy instead ships the
+current checkout, including dirty or unpushed bytes, and records no commit
+lineage for that release; use ordinary Git to decide what should be committed
+and pushed. For parallel DeepSpace-source work: `workspace new -t "<task>"` →
+commit → `workspace sync` → `workspace land`. Use `status`, `activity`,
+`releases`, and `rollback` to recover context and inspect what is live.
+
+## Project commands
+
+```sh
+npx deepspace auth login   # authenticate with app.space
+npx deepspace dev start    # local dev server (vite + miniflare)
+npx deepspace deploy       # deploy to <app>.app.space
+npx deepspace push         # sync code to the app's cloud repo
+npx deepspace agent tools <app> --json # discover tools and their input schemas
+npx deepspace agent invoke <app> <tool> --input-file tool-input.json --json
+npx deepspace add --list   # list optional features (messaging, etc.)
+npx deepspace add <feature>
+```
+
+## Context Vault security boundaries
+
+- `src/server/vault-routes.ts` is the application API and authorization
+  boundary. It verifies DeepSpace JWTs and checks the owner identity from
+  `OWNER_USER_ID` on every owner operation.
+- Vault facts, requests, grants, notifications, and audit events are private
+  RecordRoom collections. Client-side record access is not used for these
+  values; role permissions deny `viewer` and `member` reads and writes.
+- `src/server/vault-grant-room.ts` serializes grant creation, revocation, and
+  reads. One-view consumption uses a Durable Object storage transaction.
+- The visitor agent context is projected by `buildVisitorAgentContext`:
+  public facts include values, gated facts include labels only. Never pass
+  gated values or raw fact records to the visitor model.
+- OpenRouter is called from the Worker only. Set `OPENROUTER_API_KEY` and
+  optionally `OPENROUTER_MODEL` as DeepSpace deployment secrets; never put
+  secret values in source, a client bundle, or logs.
+- Do not claim field-level encryption or a platform encryption guarantee
+  without verifying the deployed service's documentation. Access revocation
+  cannot erase anything already copied or captured by a recipient.
+
+The app's in-app assistant is implemented by the Worker at `POST /api/chat`.
+Its owner tools validate input and are only available after an owner identity
+check. No generic record tools or visitor agent tools are registered.
+
+Before any deploy or app registration, follow the DeepSpace installation and
+app-identity docs and verify `npx deepspace auth whoami`. IDs are platform
+minted; do not hand-write `DEEPSPACE_APP_ID`. Deployment is a separate,
+explicitly approved step.
