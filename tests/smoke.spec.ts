@@ -2,11 +2,10 @@ import { test, expect } from '@playwright/test'
 import { captureConsoleErrors } from './helpers/errors'
 
 /**
- * Smoke tests covering both page kinds this template ships:
- *   - '/'      → the static landing (top level of src/pages/): no providers,
- *                so no auth fetch and no records WebSocket on load.
- *   - '/home'  → a dynamic page (under src/pages/(app)/): the providers mount,
- *                the nav shell renders, and the records WebSocket connects.
+ * Smoke tests covering the public landing and authenticated app boundary:
+ *   - '/'      → public profile-vault landing, with no auth fetch or records
+ *                WebSocket on load.
+ *   - '/home'  → the dynamic vault page, where the app navigation mounts.
  *
  * The "static contract" test is the guardrail for the per-page opt-out: if
  * someone moves the providers back up into _app.tsx, it fails.
@@ -22,7 +21,7 @@ test.describe('Smoke tests', () => {
     const errors = captureConsoleErrors(page)
     await page.goto('/')
     await waitForApp(page)
-    await expect(page.getByTestId('static-landing')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Personal context/ })).toBeVisible()
     expect(errors).toEqual([])
   })
 
@@ -31,7 +30,7 @@ test.describe('Smoke tests', () => {
     // <head>. Exactly one of each: index.html ships no static description or
     // canonical, because React 19 would not dedupe against them on mount.
     await page.goto('/')
-    await expect(page.getByTestId('static-landing')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Personal context/ })).toBeVisible()
     await expect(page).toHaveTitle(/\S/)
     expect(await page.locator('head meta[name="description"]').count()).toBe(1)
     expect(await page.locator('head link[rel="canonical"]').count()).toBe(1)
@@ -47,7 +46,7 @@ test.describe('Smoke tests', () => {
       if (new URL(ws.url()).pathname.startsWith('/ws/')) offenders.push(`ws: ${ws.url()}`)
     })
     await page.goto('/')
-    await expect(page.getByTestId('static-landing')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Personal context/ })).toBeVisible()
     await page.waitForTimeout(1500)
     expect(offenders).toEqual([])
   })
