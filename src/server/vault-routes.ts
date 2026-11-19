@@ -10,6 +10,13 @@ type ResolveAuth = (req: Request, env: Env) => Promise<VerifyResult | null>
 type AppRecord<T> = { recordId: string; data: T }
 type Mutation = { recordId: string }
 
+class OpenRouterError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'OpenRouterError'
+  }
+}
+
 const factInput = z.object({
   key: z.string().trim().min(1).max(100),
   category: z.string().trim().min(1).max(80),
@@ -27,9 +34,18 @@ const approvalInput = z.object({
   duration: z.enum(['15m', '24h', 'one-view', 'default']),
 }).strict()
 
-const chatInput = z.object({
+const chatMessageInput = z.object({
+  role: z.enum(['assistant', 'user']),
   content: z.string().trim().min(1).max(10_000),
 }).strict()
+
+const chatInput = z.object({
+  content: z.string().trim().min(1).max(10_000).optional(),
+  messages: z.array(chatMessageInput).min(1).max(16).optional(),
+}).strict()
+  .refine((value) => (!!value.content) !== (!!value.messages), 'Provide either content or messages.')
+  .refine((value) => !value.messages || value.messages[value.messages.length - 1]?.role === 'user', 'The latest message must be from the user.')
+  .refine((value) => !value.messages || value.messages.reduce((total, message) => total + message.content.length, 0) <= 20_000, 'Conversation is too long.')
 
 const updateAgentInput = z.object({
   factId: z.string().min(1),
@@ -784,9 +800,11 @@ export function registerVaultRoutes(app: Hono<AppContext>, resolveAuth: ResolveA
             `Vault facts for the owner: ${JSON.stringify(ownerFacts)}`,
           ].join('\n')
         : visitorContext.system
-      const content = await askOpenRouter(c.env, auth, system, parsed.data.content, isOwner)
+      const conversation = parsed.data.messages ?? [{ role: 'user' as const, content: parsed.data.content! }]
+      const content = await askOpenRouter(c.env, auth, system, conversation, isOwner)
       return c.json({ content })
     } catch (error) {
+      if (error instanceof OpenRouterError) return c.json({ error: error.message }, 502)
       return jsonError(error)
     }
   })
@@ -796,13 +814,13 @@ async function askOpenRouter(
   env: Env,
   auth: VerifyResult,
   system: string,
-  userContent: string,
+  conversation: Array<{ role: 'assistant' | 'user'; content: string }>,
   isOwner: boolean,
 ): Promise<string> {
   const model = env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free'
   const messages: Array<Record<string, unknown>> = [
     { role: 'system', content: system },
-    { role: 'user', content: userContent },
+    ...conversation,
   ]
   const tools = isOwner
     ? [
@@ -849,21 +867,33 @@ async function askOpenRouter(
     : undefined
 
   for (let turn = 0; turn < 4; turn += 1) {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
+    let response: Response
+    try {
+      response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
         Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
         'X-Title': 'DeepSpace Context Vault',
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        ...(tools ? { tools, tool_choice: 'auto' } : {}),
-        temperature: 0.2,
-      }),
-    })
-    if (!response.ok) throw new Error(`OpenRouter returned HTTP ${response.status}`)
+        body: JSON.stringify({
+          model,
+          messages,
+          ...(tools ? { tools, tool_choice: 'auto' } : {}),
+          temperature: 0.2,
+        }),
+      })
+    } catch {
+      throw new OpenRouterError('Could not reach OpenRouter. Please try again.')
+    }
+    if (!response.ok) {
+      const detail = response.status === 401
+        ? 'OpenRouter rejected the deployment API key.'
+        : response.status === 404
+          ? 'The configured OpenRouter model is unavailable.'
+          : `OpenRouter could not complete the request (HTTP ${response.status}).`
+      throw new OpenRouterError(detail)
+    }
     const payload = (await response.json()) as {
       choices?: Array<{
         message?: {
@@ -873,7 +903,7 @@ async function askOpenRouter(
       }>
     }
     const message = payload.choices?.[0]?.message
-    if (!message) throw new Error('OpenRouter returned no assistant message')
+    if (!message) throw new OpenRouterError('OpenRouter returned no assistant response.')
     const toolCalls = message.tool_calls ?? []
     messages.push({
       role: 'assistant',

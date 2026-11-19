@@ -56,6 +56,21 @@ test.describe('Smoke tests', () => {
     await expect(page.getByTestId('app-navigation')).toBeVisible({ timeout: 15000 })
   })
 
+  test('public profile opens the dedicated assistant chat', async ({ page }) => {
+    await page.route('**/api/profile', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ facts: [], gatedLabels: [] }),
+      }),
+    )
+    await page.goto('/profile')
+    await page.getByRole('link', { name: 'Chat with assistant' }).click()
+    await expect(page).toHaveURL(/\/chat$/)
+    await expect(page.getByRole('heading', { name: 'Vault assistant' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in to start chatting' })).toBeVisible()
+  })
+
   test('sign-in button visible when logged out', async ({ page }) => {
     await page.goto('/home')
     await expect(page.getByTestId('nav-sign-in-button')).toBeVisible({ timeout: 15000 })

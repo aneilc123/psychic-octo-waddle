@@ -2,6 +2,7 @@
 
 React + TypeScript frontend and a DeepSpace Worker for owner-managed profile
 facts, visitor access requests, in-app notifications, and account-bound grants.
+The dedicated `/chat` page uses the OpenRouter model configured for the Worker.
 
 ## Local checks
 
@@ -13,9 +14,8 @@ npm run test:grant
 npm run build
 ```
 
-DeepSpace builds require a platform-minted app ID in `wrangler.toml`. Register
-the app only after logging into the intended DeepSpace account. This workspace
-was intentionally not registered or deployed during implementation.
+DeepSpace builds require a platform-minted app ID in `wrangler.toml`. The
+production app is deployed at <https://context-vault.app.space>.
 
 ## Data and authorization
 
@@ -33,13 +33,29 @@ was intentionally not registered or deployed during implementation.
 - OpenRouter credentials and model selection are Worker bindings. Configure
   `OPENROUTER_API_KEY` and optionally `OPENROUTER_MODEL` as deployment secrets.
   No key is included in this repository.
+- `/chat` is a separate conversation page. It sends bounded user/assistant
+  history to the server; the Worker adds the appropriate owner or visitor
+  context before calling OpenRouter. Visitors receive public values and gated
+  labels only. Owner requests use server-validated tools.
 
 The app uses DeepSpace authentication, RecordRoom permissions, and Durable
 Objects. It makes no claim of client-side or field-level encryption. Verify
 the deployed platform's actual storage protections before entering highly
 sensitive identifiers.
 
-## API overview
+## Run and deploy
 
-See `.azure/integration-plan.md` in the workspace root for the endpoint
-inventory, commands, data schemas, and integration hand-off details.
+```sh
+npm run dev
+npm run type-check
+npm run lint
+npx deepspace test run
+npx deepspace deploy
+```
+
+Add credentials through the DeepSpace encrypted secrets store, not `.dev.vars`
+or a frontend environment variable:
+
+```sh
+npx deepspace secrets set OPENROUTER_API_KEY --stdin
+```

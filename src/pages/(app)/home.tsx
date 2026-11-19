@@ -38,7 +38,6 @@ type Grant = {
 }
 type Notice = { id: string; title: string; message: string; href: string; readAt: number; createdAt: number }
 type AuditEvent = { id: string; actorId: string; action: string; factId: string; requestId: string; grantId: string; createdAt: number }
-type Message = { role: 'assistant' | 'user'; content: string }
 type Draft = Omit<Fact, 'id' | 'updatedAt'>
 
 const emptyDraft: Draft = {
@@ -71,10 +70,6 @@ export default function HomePage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedFactIds, setSelectedFactIds] = useState<string[]>([])
   const [reason, setReason] = useState('')
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello. I can answer questions using the public profile. For gated information, submit an access request below.' },
-  ])
-  const [chatText, setChatText] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -211,28 +206,6 @@ export default function HomePage() {
       await loadData()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not submit request.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function sendMessage(event: FormEvent) {
-    event.preventDefault()
-    const content = chatText.trim()
-    if (!content || busy) return
-    setMessages((current) => [...current, { role: 'user', content }])
-    setChatText('')
-    setBusy(true)
-    setError('')
-    try {
-      const result = await vaultApi<{ content: string }>('/api/chat', {
-        method: 'POST',
-        body: JSON.stringify({ content }),
-      })
-      setMessages((current) => [...current, { role: 'assistant', content: result.content }])
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The assistant could not respond.')
-      setMessages((current) => [...current, { role: 'assistant', content: 'I could not respond just now. Please try again later.' }])
     } finally {
       setBusy(false)
     }
@@ -476,25 +449,11 @@ export default function HomePage() {
               <Notifications notices={notifications} unread={unreadCount} onRead={markRead} />
             </section>
 
-            <section className="flex min-h-[570px] flex-col overflow-hidden rounded-2xl border border-border bg-card/75 shadow-[0_16px_60px_rgba(0,0,0,.18)]">
-              <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-                <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/15 text-primary"><Sparkles size={17} /></div>
-                <div><h2 className="text-sm font-semibold">Profile assistant</h2><p className="text-xs text-muted-foreground">Public profile context only</p></div>
-                <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-success/20 bg-success/10 px-2.5 py-1 text-[10px] font-medium text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" /> RESTRICTED</span>
-              </div>
-              <div className="flex-1 space-y-4 overflow-y-auto p-5">
-                {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <p className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === 'user' ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md border border-border bg-background/70 text-foreground'}`}>{message.content}</p>
-                </div>)}
-                {busy && <div className="text-xs text-muted-foreground">Thinking…</div>}
-              </div>
-              <form onSubmit={sendMessage} className="border-t border-border p-4">
-                <div className="flex gap-2 rounded-xl border border-border bg-background/80 p-1.5 focus-within:border-primary/50">
-                  <input value={chatText} onChange={(event) => setChatText(event.target.value)} placeholder="Ask about the public profile…" className="min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground" />
-                  <button disabled={busy || !chatText.trim()} aria-label="Send message" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground disabled:opacity-45"><Send size={15} /></button>
-                </div>
-                <p className="mt-2 text-center text-[10px] leading-4 text-muted-foreground">Gated values are excluded from this assistant's context. AI responses can still be mistaken.</p>
-              </form>
+            <section className="flex min-h-[360px] flex-col justify-center rounded-2xl border border-border bg-card/75 p-6 shadow-[0_16px_60px_rgba(0,0,0,.18)] sm:p-8">
+              <div className="mb-5 grid h-11 w-11 place-items-center rounded-2xl bg-primary/15 text-primary"><Sparkles size={19} /></div>
+              <h2 className="text-xl font-semibold">Chat with the profile assistant</h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Ask questions about public profile details in a dedicated conversation. Gated values stay out of visitor chat context.</p>
+              <Link to="/chat" className="mt-6 inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">Open assistant <ArrowUpRight size={15} /></Link>
             </section>
           </div>
         )}

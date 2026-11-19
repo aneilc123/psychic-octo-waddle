@@ -89,10 +89,23 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
 
     const appOrigin = new URL(c.req.url).origin
     const authOrigin = new URL(c.env.AUTH_WORKER_URL).origin
+    const referrer = c.req.header('Referer')
+    let returnPath = '/home'
+    if (referrer) {
+      try {
+        const source = new URL(referrer)
+        if (source.origin === appOrigin && source.pathname === '/chat') returnPath = '/chat'
+      } catch {
+        return c.json({ error: 'Invalid sign-in origin' }, 400)
+      }
+    }
+    const callback = new URL('/api/auth/oauth-complete', appOrigin)
+    callback.searchParams.set('returnTo', returnPath)
+    const authUrl = new URL('/login/social', authOrigin)
+    authUrl.searchParams.set('provider', provider)
+    authUrl.searchParams.set('returnTo', callback.toString())
 
-    return c.redirect(
-      `${authOrigin}/login/social?provider=${encodeURIComponent(provider)}&returnTo=${encodeURIComponent(appOrigin)}`,
-    )
+    return c.redirect(authUrl.toString())
   })
 
   app.get('/api/auth/oauth-complete', async (c) => {
@@ -104,7 +117,8 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
     // Land the signed-in user in the app, not on the static landing. `/` is a
     // static page (no auth/realtime providers), so redirecting there after auth
     // would strand the user; `/home` is the dynamic app boundary.
-    const appHome = `${appOrigin}/home`
+    const returnPath = c.req.query('returnTo') === '/chat' ? '/chat' : '/home'
+    const appHome = `${appOrigin}${returnPath}`
 
     if (!code) return c.redirect(appHome)
 

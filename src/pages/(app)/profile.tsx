@@ -29,7 +29,7 @@ export default function ProfilePage() {
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Public profile</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Only details marked public are shown here. Private facts remain behind owner approval.</p>
           </div>
-          <Link to="/home" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">Chat or request access <ArrowRight size={15} /></Link>
+          <Link to="/chat" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">Chat with assistant <ArrowRight size={15} /></Link>
         </header>
 
         {error ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : loading ? (
@@ -50,7 +50,7 @@ export default function ProfilePage() {
             </section>}
             <section className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:p-6">
               <div className="flex items-start gap-3"><div className="mt-0.5 text-primary"><Sparkles size={18} /></div><div><h2 className="text-sm font-semibold">Have a question?</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">The visitor assistant answers from public facts only. It cannot access private values.</p></div></div>
-              <Link to="/home" className="rounded-lg border border-border bg-background/60 px-3.5 py-2 text-sm hover:bg-accent">Open assistant</Link>
+              <Link to="/chat" className="rounded-lg border border-border bg-background/60 px-3.5 py-2 text-sm hover:bg-accent">Open assistant</Link>
             </section>
           </>
         )}

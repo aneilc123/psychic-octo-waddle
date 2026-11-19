@@ -17,5 +17,6 @@ export interface NavItem {
 
 export const nav: NavItem[] = [
   { path: '/profile', label: 'Public profile' },
+  { path: '/chat', label: 'Assistant' },
   { path: '/home', label: 'Vault' },
 ]

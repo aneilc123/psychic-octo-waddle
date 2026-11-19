@@ -6,6 +6,20 @@ test.describe('API tests', () => {
     expect(res.ok()).toBeTruthy()
   })
 
+  test('social sign-in from the assistant returns to its chat route', async ({ request }) => {
+    const res = await request.get('/api/auth/social-redirect?provider=google', {
+      maxRedirects: 0,
+      headers: { Referer: 'http://127.0.0.1:5173/chat' },
+    })
+    expect(res.status()).toBe(302)
+
+    const authUrl = new URL(res.headers().location)
+    const callback = new URL(authUrl.searchParams.get('returnTo') ?? '')
+    expect(authUrl.pathname).toBe('/login/social')
+    expect(callback.pathname).toBe('/api/auth/oauth-complete')
+    expect(callback.searchParams.get('returnTo')).toBe('/chat')
+  })
+
   test('WebSocket endpoint exists', async ({ page }) => {
     // /home is a dynamic page (under src/pages/(app)/), so mounting it boots
     // the providers and auto-connects the records WebSocket. The static
